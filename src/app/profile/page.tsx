@@ -7,11 +7,34 @@ import { getStoredUser, logout } from "@/lib/auth";
 import { UserAvatar } from "@/components/user-avatar";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
+import Link from "next/link";
+import { getSubscription, type Subscription } from "@/lib/billing";
 
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = React.useState(() => getStoredUser());
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [subscription, setSubscription] = React.useState<Subscription | null>(null);
+  const [subLoading, setSubLoading] = React.useState(true);
+  const [subError, setSubError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!user) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await getSubscription();
+        if (mounted) setSubscription(data);
+      } catch (e: any) {
+        if (mounted) setSubError(e?.message || "");
+      } finally {
+        if (mounted) setSubLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   const handleLogout = async () => {
     setIsSubmitting(true);
@@ -63,8 +86,25 @@ export default function ProfilePage() {
               <Info label="Role" value={user.role ?? "user"} />
               <Info label="Verified" value={user.email_verified_at ? "Yes" : "No"} />
               <Info label="Created" value={user.created_at ?? "—"} />
+              <Info
+                label="Current Plan"
+                value={subLoading ? "Loading..." : subscription ? subscription.plan?.name : "None"}
+              />
+              <Info
+                label="Plan Status"
+                value={subLoading ? "Loading..." : subscription ? (subscription.is_active ? "active" : subscription.is_expired ? "expired" : "inactive") : "—"}
+              />
             </div>
-            <div className="pt-2">
+            {subError && (
+              <div className="text-sm text-red-600">{subError}</div>
+            )}
+            <div className="pt-2 flex flex-wrap gap-2">
+              <Button variant="secondary" asChild>
+                <Link href="/pricing">Upgrade plan</Link>
+              </Button>
+              <Button variant="secondary" asChild>
+                <Link href="/billing">Billing</Link>
+              </Button>
               <Button onClick={handleLogout} disabled={isSubmitting}>Log out</Button>
             </div>
           </CardContent>

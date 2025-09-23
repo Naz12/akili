@@ -1,12 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Navbar } from "@/components/navbar";
-import { Sidebar } from "@/components/sidebar";
+ 
 import { ChatBubble, type ChatMessage } from "@/components/chat-bubble";
 import { ChatInput } from "@/components/chat-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+ 
 import { sendChatMessage, listChatSessions, getSessionMessages } from "@/lib/chat";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
@@ -40,28 +39,38 @@ function deriveTitleFromReply(text: string): string {
 export default function ChatClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [chats, setChats] = React.useState<Chat[]>([]);
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const { isThinking, send } = useAssistant();
   const { upsertSession } = useChatSessions();
+  const [replyTo, setReplyTo] = React.useState<ChatMessage | null>(null);
+  const toTwoLinePreview = React.useCallback((content: string): string => {
+    const normalized = content.replace(/```[\s\S]*?```/g, "");
+    const lines = normalized.split(/\r?\n/);
+    const firstTwo = lines.slice(0, 2).join("\n");
+    const needsEllipsis = lines.length > 2 || normalized.length > firstTwo.length;
+    return needsEllipsis ? `${firstTwo}\n ...` : firstTwo;
+  }, []);
+
 
   const active = chats.find((c) => c.id === activeId);
 
-  const onNewChat = () => {
-    const id = Math.random().toString(36).slice(2);
-    const newChat: Chat = { id, title: "New Chat", messages: [] };
-    setChats((prev) => [newChat, ...prev]);
-    setActiveId(id);
-  };
+  // new chat is created from sidebar/app shell
 
   const onSend = async (value: string) => {
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: "user", content: value };
+    const displayPrefix = replyTo && replyTo.role === "assistant"
+      ? `"""[ref:${replyTo.id}]\n${toTwoLinePreview(replyTo.content)}\n"""\n\n`
+      : "";
+    const userVisibleContent = `${displayPrefix}${value}`;
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: "user", content: userVisibleContent };
     setChats((prev) => prev.map((c) => (c.id === activeId ? { ...c, messages: [...c.messages, userMsg] } : c)));
     const current = chats.find((c) => c.id === activeId);
     const prevSessionId = current?.sessionId;
     try {
-      const result = await send(value, prevSessionId);
+      const quoted = replyTo && replyTo.role === "assistant"
+        ? `"""[ref:${replyTo.id}]\n${replyTo.content}\n"""\n\n${value}`
+        : value;
+      const result = await send(quoted, prevSessionId);
       const aiMsg: ChatMessage = { id: crypto.randomUUID(), role: "assistant", content: result.content };
       const maybeTitle = !prevSessionId && result.sessionId ? deriveTitleFromReply(result.content) : undefined;
       setChats((prev) => prev.map((c) => {
@@ -78,14 +87,16 @@ export default function ChatClient() {
         }
         return updated;
       }));
+      setReplyTo(null);
       if (!prevSessionId && result.sessionId) {
         setActiveId(result.sessionId);
         try { router.replace(`/chat?c=${result.sessionId}`); } catch {}
         const title = deriveTitleFromReply(result.content);
         upsertSession({ id: result.sessionId, title });
       }
-    } catch (err: any) {
-      const aiMsg: ChatMessage = { id: crypto.randomUUID(), role: "assistant", content: err?.message || "Failed to get response." };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to get response.";
+      const aiMsg: ChatMessage = { id: crypto.randomUUID(), role: "assistant", content: message };
       setChats((prev) => prev.map((c) => (c.id === activeId ? { ...c, messages: [...c.messages, aiMsg] } : c)));
     }
   };
@@ -104,7 +115,6 @@ export default function ChatClient() {
         }));
         if (mapped.length > 0) {
           setChats(mapped);
-          setSidebarOpen(true);
         } else {
           // No sessions yet: create a fresh local chat so UI is visible
           const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -116,7 +126,6 @@ export default function ChatClient() {
         const idParam = params.get("c");
         if (idParam && (mapped.length ? mapped.some((c) => c.id === idParam) : idParam)) {
           setActiveId(idParam);
-          if (mapped.length > 0) setSidebarOpen(true);
         } else if (mapped.length > 0) {
           setActiveId(mapped[0]?.id ?? null);
         }
@@ -176,23 +185,11 @@ export default function ChatClient() {
   }
 
   return (
-    <div className="flex min-h-dvh w-full">
-      <Sidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        collapsed={false}
-        chats={chats.map(({ id, title }) => ({ id, title }))}
-        onNewChat={onNewChat}
-      />
-
-      <div className="flex flex-1 flex-col">
-        <Navbar onToggleSidebar={() => setSidebarOpen((v) => !v)} />
-
-        <div className="container mx-auto grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-2 p-4">
-          <ScrollArea className="min-h-0 rounded-md p-3">
+    <div className="container mx-auto grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-2 p-4">
+          <ScrollArea className="min-h-0 h-full rounded-md p-3">
             <div className="mx-auto flex max-w-3xl flex-col gap-3">
               {(active?.messages ?? []).map((m) => (
-                <ChatBubble key={m.id} message={m} />
+                <ChatBubble key={m.id} message={m} onReply={(msg) => setReplyTo(msg)} />
               ))}
               {isThinking && (
                 <div className="text-sm text-muted-foreground">Akili is typing…</div>
@@ -201,18 +198,18 @@ export default function ChatClient() {
             </div>
           </ScrollArea>
 
-          <div className="mx-auto w-full max-w-3xl">
+          <div className="sticky bottom-0 mx-auto w-full max-w-3xl bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <ChatInput
               onSend={onSend}
               disabled={isThinking || !active}
               placeholder={active && active.messages.length === 0 ? "What's on your mind today?" : undefined}
+              replyTo={replyTo?.role === "assistant" ? { id: replyTo.id, preview: toTwoLinePreview(replyTo.content) } : undefined}
+              onCancelReply={() => setReplyTo(null)}
             />
             <p className="mt-2 text-center text-xs text-muted-foreground">
               Press Enter to send, Shift+Enter for newline
             </p>
           </div>
-        </div>
-      </div>
     </div>
   );
 }
