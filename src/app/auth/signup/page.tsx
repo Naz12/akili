@@ -31,16 +31,33 @@ export default function SignupPage() {
   };
 
   return (
-    <main className="container mx-auto relative flex min-h-dvh items-center justify-center p-6">
-      <Link href="/" className="absolute left-6 top-6 font-semibold">Akili</Link>
-      <div className="w-full max-w-md rounded-lg border p-6">
-        <h1 className="mb-1 text-2xl font-semibold">Sign up</h1>
-        <p className="mb-6 text-sm text-muted-foreground">
-          Already have an account? <Link href="/auth/login" className="underline">Log in</Link>
+    <main className="container mx-auto relative flex min-h-dvh items-center justify-center p-6 animate-fadeIn">
+      {/* Brand */}
+      <Link
+        href="/"
+        className="absolute left-6 top-6 font-bold text-primary hover:text-primary-gold transition-colors"
+      >
+        Akili
+      </Link>
+
+      {/* Signup Card */}
+      <div className="w-full max-w-md rounded-2xl border bg-white p-8 shadow-lg dark:bg-neutral-900 dark:border-neutral-800">
+        <h1 className="mb-2 text-3xl font-semibold text-center text-primary">
+          Sign up
+        </h1>
+        <p className="mb-6 text-center text-sm text-muted-foreground">
+          Already have an account?{" "}
+          <Link
+            href="/auth/login"
+            className="font-medium text-primary hover:underline"
+          >
+            Log in
+          </Link>
         </p>
-        <form className="space-y-4" onSubmit={onSubmit}>
+
+        <form className="space-y-5" onSubmit={onSubmit}>
           <div>
-            <label className="mb-1 block text-sm">Name</label>
+            <label className="mb-1 block text-sm font-medium">Name</label>
             <Input
               type="text"
               value={name}
@@ -48,10 +65,11 @@ export default function SignupPage() {
               placeholder="Your name"
               required
               disabled={isSubmitting}
+              className="focus-visible:ring-primary-gold"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm">Email</label>
+            <label className="mb-1 block text-sm font-medium">Email</label>
             <Input
               type="email"
               value={email}
@@ -59,10 +77,11 @@ export default function SignupPage() {
               placeholder="you@example.com"
               required
               disabled={isSubmitting}
+              className="focus-visible:ring-primary-gold"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm">Password</label>
+            <label className="mb-1 block text-sm font-medium">Password</label>
             <Input
               type="password"
               value={password}
@@ -70,27 +89,44 @@ export default function SignupPage() {
               placeholder="••••••••"
               required
               disabled={isSubmitting}
+              className="focus-visible:ring-primary-gold"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm">Region</label>
-            <Input
-              type="text"
+            <label className="mb-1 block text-sm font-medium">Region</label>
+            <select
               value={region}
               onChange={(e) => setRegion(e.target.value)}
-              placeholder="local"
-              required
               disabled={isSubmitting}
-            />
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-gold disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="local">Local</option>
+              <option value="intl">International</option>
+            </select>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button className="w-full" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create account"}
+
+          {error && (
+            <div className="rounded-md bg-red-50 p-2 text-sm text-red-600 dark:bg-red-900/20">
+              {error}
+            </div>
+          )}
+
+          <Button
+            className="w-full bg-primary text-white hover:bg-primary/90 disabled:opacity-60"
+            type="submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                Creating...
+              </span>
+            ) : (
+              "Create account"
+            )}
           </Button>
         </form>
       </div>
     </main>
   );
 }
-
-

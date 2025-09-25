@@ -6,14 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { X, MoreVertical, Share2, Pencil, Trash } from "lucide-react";
+import { Plus, Search, BookOpen, Folder, LogOut } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getStoredUser } from "@/lib/auth";
-import { deleteSession, renameSession, listChatSessions } from "@/lib/chat";
+import { getStoredUser, logout } from "@/lib/auth";
+import { renameSession } from "@/lib/chat";
 import { useChatSessions } from "@/components/chat-sessions-provider";
 import { UserAvatar } from "@/components/user-avatar";
-
- 
 
 export function Sidebar({
   open,
@@ -30,22 +28,12 @@ export function Sidebar({
   const searchParams = useSearchParams();
   const activeId = searchParams.get("c") ?? "default";
   const [mounted, setMounted] = React.useState(false);
-  const [user, setUser] = React.useState<ReturnType<typeof getStoredUser>>(null);
-  const { sessions, loading, refreshSessions, upsertSession } = useChatSessions();
-  const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
-  const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [user, setUser] =
+    React.useState<ReturnType<typeof getStoredUser>>(null);
+  const { sessions, loading, refreshSessions, upsertSession } =
+    useChatSessions();
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editingTitle, setEditingTitle] = React.useState<string>("");
-  const [isSaving, setIsSaving] = React.useState(false);
-
-  React.useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && open) onClose();
-      if (e.key === "Escape") setOpenMenuId(null);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
 
   React.useEffect(() => {
     if (open) void refreshSessions();
@@ -56,9 +44,11 @@ export function Sidebar({
     setUser(getStoredUser());
   }, []);
 
+  const filteredSessions = sessions;
+
   return (
     <>
-      {/* Mobile overlay (render after mount to avoid SSR/CSR mismatch) */}
+      {/* Mobile overlay */}
       {mounted && (
         <div
           className={cn(
@@ -71,233 +61,176 @@ export function Sidebar({
 
       <aside
         className={cn(
-          // shared
-          "z-50 flex flex-col overflow-y-hidden overflow-x-hidden border-r border-zinc-300/50 dark:border-zinc-700/60 bg-background transition-all duration-200 ease-in-out",
-          // mobile: overlay slide in/out
-          "fixed inset-y-0 left-0 w-[85vw] max-w-[95vw] md:hidden",
+          "z-40 flex flex-col bg-zinc-950 text-zinc-100",
+          "transform transition-transform duration-300 ease-in-out",
+          // mobile
+          "fixed top-14 bottom-0 left-0 w-[85vw] max-w-[95vw] md:hidden", // <-- starts at top-14
           open ? "translate-x-0" : "-translate-x-full",
-          // desktop: push layout with width transition
-          "hidden md:flex md:relative md:inset-auto md:h-auto",
-          open ? "md:w-72 lg:w-80" : "md:w-0",
+          // desktop
+          "hidden md:flex md:fixed md:top-14 md:bottom-0 md:left-0 md:w-64", // <-- also top-14
           className
         )}
       >
-        {/* Section 1: Header with toggle */}
-        <div className="-mx-4 -mt-4 bg-background/95 px-4 py-3 backdrop-blur md:mx-0 md:mt-0">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">Akili</span>
-            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close sidebar" className="md:hidden">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+        {/* New chat (top) */}
+        <div className="p-3 border-b border-zinc-800">
+          <Button
+            onClick={() => {
+              onNewChat();
+              if (window.innerWidth < 768) onClose();
+            }}
+            className="w-full justify-start gap-2 rounded-md bg-primary text-black font-medium hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            New Chat
+          </Button>
         </div>
 
-        {/* Section 2: Actions (fixed) */}
-        <div className="-mx-4 bg-background/95 px-4 py-3 backdrop-blur md:mx-0">
-          <div className="flex gap-2">
-            <Button
-              onClick={onNewChat}
-              className="w-full transition-colors bg-black text-white hover:bg-black/90 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
-            >
-              New Chat
-            </Button>
-          </div>
+        {/* Pinned actions */}
+        <div className="p-2 border-b border-zinc-800 space-y-1">
+          <SidebarLink
+            href="#"
+            icon={<Search className="h-4 w-4" />}
+            label="Search chats"
+          />
+          <SidebarLink
+            href="#"
+            icon={<BookOpen className="h-4 w-4" />}
+            label="Library"
+          />
         </div>
 
-        {/* Section 3: Chats (scrollable) */}
-        <nav className="space-y-1 flex-1 overflow-y-auto pt-3">
-          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Chats</p>
+        {/* Sessions */}
+        <nav className="flex-1 overflow-y-auto px-2 py-3 custom-scrollbar space-y-1">
           {loading ? (
-            <div className="space-y-1 px-2">
+            <div className="space-y-1">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Skeleton className="h-8 w-full" />
-                </div>
+                <Skeleton key={i} className="h-8 w-full rounded-md" />
               ))}
             </div>
-          ) : sessions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No chats yet</p>
+          ) : filteredSessions.length === 0 ? (
+            <p className="text-sm text-zinc-400">No chats yet</p>
           ) : (
-            sessions.map((c) => {
+            filteredSessions.map((c) => {
               const isActive = c.id === activeId;
               return (
-                <div key={c.id} className="relative">
-                  <div
-                    className={cn(
-                      "flex items-center justify-between gap-2 truncate rounded-md px-2 py-2 text-sm transition-colors",
-                      "hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                      isActive && "bg-zinc-200 dark:bg-zinc-700"
-                    )}
-                  >
-                    {editingId === c.id ? (
-                      <form
-                        className="min-w-0 flex-1"
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          const next = editingTitle.trim();
-                          if (!next || next === c.title) {
-                            setEditingId(null);
-                            return;
-                          }
-                          setIsSaving(true);
-                          try {
-                            const res = await renameSession(c.id, next);
-                            upsertSession({ id: res.id, title: res.title });
-                          } finally {
-                            setIsSaving(false);
-                            setEditingId(null);
-                          }
-                        }}
-                      >
-                        <Input
-                          value={editingTitle}
-                          onChange={(e) => setEditingTitle(e.target.value)}
-                          onBlur={async () => {
-                            if (isSaving) return;
-                            const next = editingTitle.trim();
-                            if (!next || next === c.title) {
-                              setEditingId(null);
-                              return;
-                            }
-                            setIsSaving(true);
-                            try {
-                              const res = await renameSession(c.id, next);
-                              upsertSession({ id: res.id, title: res.title });
-                            } finally {
-                              setIsSaving(false);
-                              setEditingId(null);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") {
-                              e.preventDefault();
-                              setEditingId(null);
-                            }
-                          }}
-                          autoFocus
-                          className="h-8"
-                        />
-                      </form>
-                    ) : (
-                      <Link
-                        href={`/chat?c=${c.id}`}
-                        className="min-w-0 flex-1 truncate"
-                        onClick={() => setOpenMenuId(null)}
-                      >
-                        {c.title}
-                      </Link>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="More options"
-                      onClick={(e) => {
+                <Link
+                  key={c.id}
+                  href={`/chat?c=${c.id}`}
+                  className={cn(
+                    "flex items-center gap-2 truncate rounded-md px-3 py-2 text-sm",
+                    "hover:bg-zinc-800",
+                    isActive && "bg-zinc-800 text-white font-medium"
+                  )}
+                >
+                  <Folder className="h-4 w-4 text-zinc-400" />
+                  {editingId === c.id ? (
+                    <form
+                      onSubmit={async (e) => {
                         e.preventDefault();
-                        e.stopPropagation();
-                        setOpenMenuId((prev) => (prev === c.id ? null : c.id));
+                        const next = editingTitle.trim();
+                        if (!next || next === c.title) {
+                          setEditingId(null);
+                          return;
+                        }
+                        const res = await renameSession(c.id, next);
+                        upsertSession({ id: res.id, title: res.title });
+                        setEditingId(null);
                       }}
                     >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  {openMenuId === c.id ? (
-                    <div className="absolute right-2 top-10 z-50 w-40 rounded-md border bg-background p-1 shadow-md">
-                      <button
-                        className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          try {
-                            const url = `${window.location.origin}/chat?c=${c.id}`;
-                            if (navigator.share) {
-                              await navigator.share({ title: c.title || "Chat", url });
-                            } else if (navigator.clipboard?.writeText) {
-                              await navigator.clipboard.writeText(url);
-                              setCopiedId(c.id);
-                              setTimeout(() => setCopiedId((prev) => (prev === c.id ? null : prev)), 1500);
-                            }
-                          } finally {
-                            setOpenMenuId(null);
-                          }
-                        }}
-                      >
-                        <Share2 className="h-4 w-4" />
-                        <span>{copiedId === c.id ? "Link copied" : "Share"}</span>
-                      </button>
-                      <button
-                        className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setEditingId(c.id);
-                          setEditingTitle(c.title || "");
-                          setOpenMenuId(null);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                        <span>Rename</span>
-                      </button>
-                      <button
-                        className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-red-600 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (!window.confirm("Delete this chat? This cannot be undone.")) {
-                            setOpenMenuId(null);
-                            return;
-                          }
-                          try {
-                            await deleteSession(c.id);
-                            const after = await listChatSessions({ with_messages: false });
-                            if (c.id === activeId) {
-                              if (after.length > 0) {
-                                try {
-                                  router.replace(`/chat?c=${after[0].id}`);
-                                } catch {}
-                              } else {
-                                try {
-                                  router.replace("/chat");
-                                } catch {}
-                              }
-                            }
-                            await refreshSessions();
-                          } finally {
-                            setOpenMenuId(null);
-                          }
-                        }}
-                      >
-                        <Trash className="h-4 w-4" />
-                        <span>Delete</span>
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                      <Input
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        autoFocus
+                        className="h-7 text-xs"
+                      />
+                    </form>
+                  ) : (
+                    <span className="truncate">{c.title}</span>
+                  )}
+                </Link>
               );
             })
           )}
         </nav>
 
-        {/* Section 4: Sticky profile */}
-        <ProfileFooter userName={mounted ? user?.name : undefined} userEmail={mounted ? user?.email : undefined} />
+        {/* Persistent new chat + footer */}
+        <div className="border-t border-zinc-800 p-3">
+          <Button
+            onClick={() => {
+              onNewChat();
+              if (window.innerWidth < 768) onClose();
+            }}
+            variant="outline"
+            className="w-full justify-center gap-2 rounded-md border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+          >
+            <Plus className="h-4 w-4" />
+            New Chat
+          </Button>
+        </div>
+
+        <ProfileFooter
+          userName={mounted ? user?.name : undefined}
+          userEmail={mounted ? user?.email : undefined}
+        />
       </aside>
     </>
   );
 }
 
-function ProfileFooter({ userName, userEmail }: { userName?: string | null; userEmail?: string | null }) {
-  if (!userName) return null;
+function SidebarLink({
+  href,
+  icon,
+  label,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+}) {
   return (
-    <div className="sticky bottom-0 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
-      <Link href="/profile" className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-        <UserAvatar name={userName} size={28} />
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium">{userName}</div>
-          <div className="truncate text-xs text-muted-foreground">{userEmail}</div>
-        </div>
-      </Link>
-    </div>
+    <Link
+      href={href}
+      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-zinc-800"
+    >
+      {icon}
+      {label}
+    </Link>
   );
 }
 
-
+function ProfileFooter({
+  userName,
+  userEmail,
+}: {
+  userName?: string | null;
+  userEmail?: string | null;
+}) {
+  if (!userName) return null;
+  return (
+    <div className="border-t border-zinc-800 px-4 py-3 bg-zinc-950">
+      <div className="flex items-center justify-between">
+        <Link
+          href="/profile"
+          className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-zinc-800"
+        >
+          <UserAvatar name={userName} size={28} />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium">{userName}</div>
+            <div className="truncate text-xs text-zinc-400">{userEmail}</div>
+          </div>
+        </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Sign out"
+          className="text-zinc-400 hover:text-red-600"
+          onClick={() => {
+            logout();
+            window.location.href = "/auth/login";
+          }}
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
