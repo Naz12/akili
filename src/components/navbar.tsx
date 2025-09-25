@@ -58,9 +58,6 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
             !isLoggedIn ? (
               <>
                 <Button variant="ghost" asChild>
-                  <Link href="/pricing">Pricing</Link>
-                </Button>
-                <Button variant="ghost" asChild>
                   <Link href="/auth/login">Log in</Link>
                 </Button>
                 <Button asChild className="transition-colors bg-black text-white hover:bg-black/90 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700">
@@ -69,9 +66,6 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
               </>
             ) : (
               <>
-                <Button variant="ghost" asChild>
-                  <Link href="/pricing">Pricing</Link>
-                </Button>
                 <Button variant="ghost" asChild>
                   <Link href="/profile" className="flex items-center gap-2">
                     <UserAvatar name={user?.name} size={22} />

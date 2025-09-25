@@ -3,6 +3,7 @@
 import * as React from "react";
  
 import { ChatBubble, type ChatMessage } from "@/components/chat-bubble";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ChatInput } from "@/components/chat-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
  
@@ -181,7 +182,26 @@ export default function ChatClient() {
   }, []);
 
   if (!mounted || !activeId || !active) {
-    return null;
+    return (
+      <div className="container mx-auto grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-2 p-4">
+        <div className="min-h-0 h-full rounded-md p-3">
+          <div className="mx-auto flex max-w-3xl flex-col gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-2">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="sticky bottom-0 mx-auto w-full max-w-3xl bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3">
+          <Skeleton className="h-11 w-full" />
+          <div className="mt-2 text-center">
+            <Skeleton className="h-4 w-48 mx-auto" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -192,7 +212,10 @@ export default function ChatClient() {
                 <ChatBubble key={m.id} message={m} onReply={(msg) => setReplyTo(msg)} />
               ))}
               {isThinking && (
-                <div className="text-sm text-muted-foreground">Akili is typing…</div>
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="h-14 w-5/6" />
+                </div>
               )}
               <div ref={messagesEndRef} />
             </div>

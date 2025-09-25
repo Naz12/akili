@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import Link from "next/link";
 import { getSubscription, type Subscription } from "@/lib/billing";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -25,8 +26,9 @@ export default function ProfilePage() {
       try {
         const data = await getSubscription();
         if (mounted) setSubscription(data);
-      } catch (e: any) {
-        if (mounted) setSubError(e?.message || "");
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "";
+        if (mounted) setSubError(message);
       } finally {
         if (mounted) setSubLoading(false);
       }
@@ -86,14 +88,23 @@ export default function ProfilePage() {
               <Info label="Role" value={user.role ?? "user"} />
               <Info label="Verified" value={user.email_verified_at ? "Yes" : "No"} />
               <Info label="Created" value={user.created_at ?? "—"} />
-              <Info
-                label="Current Plan"
-                value={subLoading ? "Loading..." : subscription ? subscription.plan?.name : "None"}
-              />
-              <Info
-                label="Plan Status"
-                value={subLoading ? "Loading..." : subscription ? (subscription.is_active ? "active" : subscription.is_expired ? "expired" : "inactive") : "—"}
-              />
+              {subLoading ? (
+                <>
+                  <div className="rounded-md border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">Current Plan</div>
+                    <Skeleton className="mt-2 h-4 w-28" />
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">Plan Status</div>
+                    <Skeleton className="mt-2 h-4 w-20" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Info label="Current Plan" value={subscription ? subscription.plan?.name : "None"} />
+                  <Info label="Plan Status" value={subscription ? (subscription.is_active ? "active" : subscription.is_expired ? "expired" : "inactive") : "—"} />
+                </>
+              )}
             </div>
             {subError && (
               <div className="text-sm text-red-600">{subError}</div>

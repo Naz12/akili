@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { X, MoreVertical, Share2, Pencil, Trash } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -28,8 +29,9 @@ export function Sidebar({
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeId = searchParams.get("c") ?? "default";
-  const [user] = React.useState(() => getStoredUser());
-  const { sessions, refreshSessions, upsertSession } = useChatSessions();
+  const [mounted, setMounted] = React.useState(false);
+  const [user, setUser] = React.useState<ReturnType<typeof getStoredUser>>(null);
+  const { sessions, loading, refreshSessions, upsertSession } = useChatSessions();
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -49,16 +51,23 @@ export function Sidebar({
     if (open) void refreshSessions();
   }, [open, refreshSessions]);
 
+  React.useEffect(() => {
+    setMounted(true);
+    setUser(getStoredUser());
+  }, []);
+
   return (
     <>
-      {/* Mobile overlay */}
-      <div
-        className={cn(
-          "fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden",
-          open ? "opacity-100" : "pointer-events-none opacity-0"
-        )}
-        onClick={onClose}
-      />
+      {/* Mobile overlay (render after mount to avoid SSR/CSR mismatch) */}
+      {mounted && (
+        <div
+          className={cn(
+            "fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden",
+            open ? "opacity-100" : "pointer-events-none opacity-0"
+          )}
+          onClick={onClose}
+        />
+      )}
 
       <aside
         className={cn(
@@ -98,7 +107,15 @@ export function Sidebar({
         {/* Section 3: Chats (scrollable) */}
         <nav className="space-y-1 flex-1 overflow-y-auto pt-3">
           <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Chats</p>
-          {sessions.length === 0 ? (
+          {loading ? (
+            <div className="space-y-1 px-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ))}
+            </div>
+          ) : sessions.length === 0 ? (
             <p className="text-sm text-muted-foreground">No chats yet</p>
           ) : (
             sessions.map((c) => {
@@ -262,7 +279,7 @@ export function Sidebar({
         </nav>
 
         {/* Section 4: Sticky profile */}
-        <ProfileFooter userName={user?.name} userEmail={user?.email} />
+        <ProfileFooter userName={mounted ? user?.name : undefined} userEmail={mounted ? user?.email : undefined} />
       </aside>
     </>
   );

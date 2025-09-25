@@ -6,6 +6,7 @@ import { getSubscription, openBillingPortal, type Subscription } from "@/lib/bil
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/navbar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getStoredUser } from "@/lib/auth";
 
 export default function BillingPage() {
@@ -26,8 +27,9 @@ export default function BillingPage() {
       try {
         const data = await getSubscription();
         if (mounted) setSubscription(data);
-      } catch (e: any) {
-        if (mounted) setError(e?.message || "Failed to load subscription");
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Failed to load subscription";
+        if (mounted) setError(message);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -45,8 +47,9 @@ export default function BillingPage() {
         return_url: typeof window !== "undefined" ? window.location.href : undefined,
       });
       if (url) window.location.href = url;
-    } catch (e: any) {
-      setError(e?.message || "Failed to open billing portal");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to open billing portal";
+      setError(message);
     } finally {
       setOpeningPortal(false);
     }
@@ -65,7 +68,26 @@ export default function BillingPage() {
           {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
 
           {loading ? (
-            <div>Loading...</div>
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="mt-2 h-4 w-56" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-64" />
+                  <Skeleton className="h-4 w-72" />
+                  <Skeleton className="h-4 w-56" />
+                  <Skeleton className="h-4 w-48" />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <div className="flex gap-2 w-full">
+                  <Skeleton className="h-9 w-28" />
+                  <Skeleton className="h-9 w-40" />
+                </div>
+              </CardFooter>
+            </Card>
           ) : (
             <Card>
               <CardHeader>
